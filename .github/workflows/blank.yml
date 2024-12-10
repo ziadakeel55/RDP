@@ -1,0 +1,165 @@
+name: PC
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Setup ngrok
+        run: |
+          # Download ngrok
+          Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
+          
+          # Extract ngrok
+          Expand-Archive ngrok.zip
+          
+          # Authenticate ngrok
+          .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        env:
+          NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
+
+      - name: Download Files
+        run: |
+          $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+          $filesFolder = "$desktopPath\Files"
+          if (-not (Test-Path $filesFolder)) {
+            New-Item -ItemType Directory -Path $filesFolder
+          }
+          $filesToDownload = @(
+            "BlueStacksFullInstaller_5.21.218.1001_amd64_native.exe",
+            "BraveSetup.exe",
+            "MSI-APP-Player.zip",
+            "GLP_installer_900223150_market.exe",
+            "MEGAsyncSetup64.exe",
+            "DiscordSetup.exe",
+            "ACCCx6_3_0_207.zip",
+            "TelegramSetup.exe",
+            "MacroRecorderSetup.exe",
+            "MemuPlaySetup.exe",
+            "GOG_Galaxy_2.0.exe"
+          )
+          $fileUrls = @{
+            "BlueStacksFullInstaller_5.21.218.1001_amd64_native.exe" = "https://ak-build.bluestacks.com/public/app-player/windows/nxt/5.21.218.1001/f5c0481043481fe011575dd74a2d5434/FullInstaller/x64/BlueStacksFullInstaller_5.21.218.1001_amd64_native.exe";
+            "BraveSetup.exe" = "https://laptop-updates.brave.com/latest/winx64";
+            "MSI-APP-Player.zip" = "https://download.msi.com/uti_exe/nb/MSI-APP-Player.zip";
+            "GLP_installer_900223150_market.exe" = "https://down.gameloop.com/channel/3/26460/GLP_installer_900223150_market.exe";
+            "MEGAsyncSetup64.exe" = "https://mega.nz/MEGAsyncSetup64.exe";
+            "DiscordSetup.exe" = "https://discord.com/api/download?platform=win";
+            "ACCCx6_3_0_207.zip" = "https://ccmdls.adobe.com/AdobeProducts/StandaloneBuilds/ACCC/ESD/6.3.0/207/win64/ACCCx6_3_0_207.zip";
+            "TelegramSetup.exe" = "https://telegram.org/dl/desktop/win64";
+            "MacroRecorderSetup.exe" = "https://www.macrorecorder.com/MacroRecorderSetup.exe";
+            "MemuPlaySetup.exe" = "https://www.memuplay.com/download-new.php?file_name=MEmu-Setup-9.1.5.0-hac7b09c23&from=offline_installer_web";
+            "GOG_Galaxy_2.0.exe" = "https://webinstallers.gog-statics.com/download/GOG_Galaxy_2.0.exe"
+          }
+          foreach ($file in $filesToDownload) {
+            $filePath = "$filesFolder\$file"
+            if (-not (Test-Path $filePath)) {
+              $fileUrl = $fileUrls[$file]
+              if ($fileUrl -ne $null) {
+                Invoke-WebRequest -Uri $fileUrl -OutFile $filePath
+                if ($file -eq "MSI-APP-Player.zip") {
+                  Expand-Archive -Path $filePath -DestinationPath "$filesFolder\MSI-APP-Player"
+                  Remove-Item $filePath
+                } elseif ($file -eq "ACCCx6_3_0_207.zip") {
+                  Expand-Archive -Path $filePath -DestinationPath "$filesFolder\ACCCx6_3_0_207"
+                  Remove-Item $filePath
+                }
+              } else {
+                Write-Host "URL not found for file: $file"
+              }
+            }
+          }
+
+      - name: Install Applications
+        run: |
+          # Install Firefox
+          Invoke-WebRequest "https://download.mozilla.org/?product=firefox-msi-latest-ssl&os=win64&lang=en-US" -OutFile "FirefoxSetup.msi"
+          Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "FirefoxSetup.msi", "/quiet", "/norestart" -Wait
+          
+          # Install AnyDesk
+          Invoke-WebRequest "https://download.anydesk.com/AnyDesk.msi" -OutFile "AnyDeskInstaller.msi"
+          Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "AnyDeskInstaller.msi", "/quiet", "/norestart" -Wait
+          
+          # Install Steam
+          Invoke-WebRequest "https://steamcdn-a.akamaihd.net/client/installer/SteamSetup.exe" -OutFile "SteamSetup.exe"
+          Start-Process -FilePath "SteamSetup.exe" -ArgumentList "/S" -Wait
+          
+          # Install Epic Games Launcher
+          Invoke-WebRequest "https://launcher-public-service-prod06.ol.epicgames.com/launcher/api/installer/download/EpicGamesLauncherInstaller.msi" -OutFile "EpicGamesLauncherInstaller.msi"
+          Start-Process -FilePath "msiexec.exe" -ArgumentList "/i", "EpicGamesLauncherInstaller.msi", "/quiet", "/norestart" -Wait
+
+          # Install Ubisoft Connect
+          Invoke-WebRequest "https://ubistatic3-a.akamaihd.net/orbit/launcher_installer/UbisoftConnectInstaller.exe" -OutFile "UbisoftConnectInstaller.exe"
+          Start-Process -FilePath "UbisoftConnectInstaller.exe" -ArgumentList "/S" -Wait
+          
+          # Install WinRAR 64-bit
+          Invoke-WebRequest "https://www.win-rar.com/fileadmin/winrar-versions/winrar/winrar-x64-700.exe" -OutFile "WinRARInstaller.exe"
+          Start-Process -FilePath "WinRARInstaller.exe" -ArgumentList "/S" -Wait
+
+          # Install WebCatalog
+          Invoke-WebRequest "https://webcatalog.io/api/download/?platform=windows&arch=universal" -OutFile "WebCatalog-Setup.exe"
+          Start-Process -FilePath "WebCatalog-Setup.exe" -ArgumentList "/S" -Wait
+          
+          # Install VLC Media Player
+          Invoke-WebRequest "https://videolan.interhost.co.il/vlc/3.0.16/win64/vlc-3.0.16-win64.exe" -OutFile "vlc-3.0.16-win64.exe"
+          Start-Process -FilePath "vlc-3.0.16-win64.exe" -ArgumentList "/L=1033 /S" -Wait
+          
+          # Install OBS Studio
+          Invoke-WebRequest "https://cdn-fastly.obsproject.com/downloads/OBS-Studio-30.1.2-Full-Installer-x64.exe" -OutFile "OBS-Studio-Installer.exe"
+          Start-Process -FilePath "OBS-Studio-Installer.exe" -ArgumentList "/S" -Wait
+          
+          # Install TaskbarX
+          $taskbarXPath = "$env:ProgramFiles\TaskbarX"
+          Invoke-WebRequest "https://github.com/ChrisAnd1998/TaskbarX/releases/download/1.7.8.0/TaskbarX_1.7.8.0_x64.zip" -OutFile "TaskbarX.zip"
+          Expand-Archive -Path "TaskbarX.zip" -DestinationPath $taskbarXPath
+          Start-Process -FilePath "$taskbarXPath\TaskbarX.exe" -ArgumentList "-silent"
+          
+      - name: Manage Desktop UI
+        run: |
+          # Switch to Dark Mode
+          reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v AppsUseLightTheme /t REG_DWORD /d 0 /f
+          reg add HKCU\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize /v SystemUsesLightTheme /t REG_DWORD /d 0 /f
+          
+          # Show Search Box Icon
+          reg add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Search" /v SearchboxTaskbarMode /t REG_DWORD /d 1 /f
+          
+          # Display Desktop Icons
+          $desktopPath = [System.Environment]::GetFolderPath('Desktop')
+          $shell = New-Object -ComObject WScript.Shell
+          $icons = @{
+            "User's Files" = "shell:Profile"
+            "This PC" = "::{20D04FE0-3AEA-1069-A2D8-08002B30309D}"
+            "Network" = "shell:NetworkPlacesFolder"
+            "Control Panel" = "shell:ControlPanelFolder"
+            "Recycle Bin" = "shell:RecycleBinFolder"
+          }
+          foreach ($icon in $icons.Keys) {
+            $iconPath = "$desktopPath\$icon.lnk"
+            $targetPath = $icons[$icon]
+            $shortcut = $shell.CreateShortcut($iconPath)
+            $shortcut.TargetPath = $targetPath
+            $shortcut.Save()
+          }
+
+      - name: Enable Remote Desktop
+        run: |
+          # Enable TS
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+
+          # Enable Remote Desktop Firewall Rule
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+
+          # Set User Authentication for RDP
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+
+      - name: Set Local User Password
+        run: Set-LocalUser -Name "runneradmin" -Password (ConvertTo-SecureString -AsPlainText "P@ssw0rd!" -Force)
+
+      - name: Create Tunnel
+        run: .\ngrok\ngrok.exe tcp 3389
