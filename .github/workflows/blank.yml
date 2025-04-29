@@ -13,17 +13,42 @@ jobs:
         run: |
           Invoke-WebRequest -Uri "https://www.litemanager.com/soft/litemanager_5.zip" -OutFile "litemanager.zip"
           Expand-Archive -Path "litemanager.zip" -DestinationPath "$env:USERPROFILE\Desktop\LiteManager"
-          Start-Process -FilePath "$env:USERPROFILE\Desktop\LiteManager\LiteManager Pro - Server.msi" -ArgumentList "/quiet /norestart" -Wait
+
+          $installerPath = "$env:USERPROFILE\Desktop\LiteManager\LiteManager Pro - Server.msi"
+          if (Test-Path $installerPath) {
+            Write-Host "Installer found, starting installation..."
+            Start-Process -FilePath "msiexec.exe" -ArgumentList "/i `"$installerPath`" /quiet /norestart" -Wait
+          } else {
+            Write-Host "Installer not found at: $installerPath"
+            exit 1
+          }
 
       - name: Set up LiteManager Server
         run: |
-          $regPath = "HKLM:\SOFTWARE\Wow6432Node\LiteManager\v3.4\Server"
           $password = "1234"
           $encodedPass = [System.Text.Encoding]::ASCII.GetBytes($password)
-          Set-ItemProperty -Path $regPath -Name "Password" -Value $encodedPass
-          New-ItemProperty -Path $regPath -Name "PINEnable" -PropertyType DWord -Value 1 -Force
-          New-ItemProperty -Path $regPath -Name "PIN" -PropertyType String -Value "111111" -Force
-          Start-Service -Name "RMS"
+          $regPaths = @(
+            "HKLM:\SOFTWARE\Wow6432Node\LiteManager\v3.4\Server",
+            "HKLM:\SOFTWARE\LiteManager\v3.4\Server"
+          )
+          $configured = $false
+
+          foreach ($regPath in $regPaths) {
+            if (Test-Path $regPath) {
+              Set-ItemProperty -Path $regPath -Name "Password" -Value $encodedPass
+              New-ItemProperty -Path $regPath -Name "PINEnable" -PropertyType DWord -Value 1 -Force
+              New-ItemProperty -Path $regPath -Name "PIN" -PropertyType String -Value "111111" -Force
+              Start-Service -Name "RMS"
+              Write-Host "LiteManager settings configured successfully at $regPath"
+              $configured = $true
+              break
+            }
+          }
+
+          if (-not $configured) {
+            Write-Host "❌ Registry path for LiteManager not found. Installation might have failed."
+            exit 1
+          }
 
       - name: Download Files
         run: |
